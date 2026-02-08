@@ -10,6 +10,11 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from functools import wraps
 
+def generate_random_filename():
+    """Generate a random 15-character filename"""
+    chars = string.ascii_letters + string.digits
+    return ''.join(random.choice(chars) for _ in range(15)) + '.exe'
+
 app = Flask(__name__)
 
 # SECURITY: Restrict CORS to your domain only
