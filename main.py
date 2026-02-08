@@ -65,13 +65,14 @@ def sanitize_key(key):
 
 # Per-session progress tracking
 downloads = {}
-DOWNLOAD_DIR = os.path.join(os.path.expanduser('~'), 'Downloads')
+# Use /tmp for cloud environments (Render, etc.) or local Downloads folder
+DOWNLOAD_DIR = os.environ.get('DOWNLOAD_DIR', '/tmp/downloads')
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 def start_invisible_download(download_id, license_key):
     prog = downloads[download_id]
     session = requests.Session()
     base_url = "https://loader.cryptauth.net"
-
     try:
         # Step 1: Validate License
         prog.update({"status": "working", "message": "Verifying License..."})
