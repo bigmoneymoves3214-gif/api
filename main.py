@@ -3,6 +3,8 @@ import uuid
 import threading
 import time
 import re
+import random
+import string
 import requests
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -186,7 +188,7 @@ def download_file(download_id):
         return jsonify({"error": "Access denied"}), 403
     
     if os.path.exists(path):
-        response = send_file(path, as_attachment=True, download_name="loader.exe")
+        response = send_file(path, as_attachment=True, download_name=generate_random_filename())
         # Clean up after download
         threading.Thread(target=cleanup_download, args=(download_id, path)).start()
         return response
