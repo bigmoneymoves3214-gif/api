@@ -157,6 +157,50 @@ def start():
     except Exception as e:
         return jsonify({"error": "Server error"}), 500
 
+@app.route('/get-download-link', methods=['POST'])
+@rate_limit
+def get_download_link():
+    """Validate license and return direct download URL instead of downloading to server"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid request"}), 400
+        
+        raw_key = data.get('key')
+        key = sanitize_key(raw_key)
+        
+        if not key:
+            return jsonify({"error": "Invalid key format"}), 400
+        
+        base_url = "https://loader.cryptauth.net"
+        
+        # Step 1: Validate License
+        check_res = requests.post(f"{base_url}/check_license.php", 
+                                  data={"license": key}, 
+                                  headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                  timeout=10)
+        
+        license_data = check_res.json()
+        
+        if license_data.get("status") != "valid":
+            return jsonify({"error": license_data.get("message", "Invalid Key")}), 400
+        
+        app_id = license_data.get("app_id")
+        
+        # Return the download URL for direct client download
+        download_url = f"{base_url}/download.php?app_id={app_id}"
+        
+        return jsonify({
+            "status": "success",
+            "download_url": download_url,
+            "app_id": app_id
+        })
+        
+    except requests.Timeout:
+        return jsonify({"error": "License server timeout"}), 504
+    except Exception as e:
+        return jsonify({"error": "Server error"}), 500
+
 @app.route('/progress/<download_id>')
 def get_progress(download_id):
     # Validate download_id format (UUID)
