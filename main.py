@@ -196,13 +196,22 @@ def get_download_link():
         if dl_res.status_code != 200:
             return jsonify({"error": "Download server error"}), 502
         
+        # Get original filename from cryptauth or generate random one
+        original_filename = None
+        content_disp = dl_res.headers.get('content-disposition', '')
+        if 'filename=' in content_disp:
+            original_filename = content_disp.split('filename=')[1].strip('"\'')
+        
+        if not original_filename:
+            original_filename = generate_random_filename()
+        
         # Use BytesIO + send_file for proper binary handling
         file_data = io.BytesIO(dl_res.content)
         return send_file(
             file_data,
             mimetype='application/octet-stream',
             as_attachment=True,
-            download_name=generate_random_filename()
+            download_name=original_filename
         )
         
     except requests.Timeout:
