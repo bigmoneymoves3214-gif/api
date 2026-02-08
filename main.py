@@ -5,8 +5,9 @@ import time
 import re
 import random
 import string
+import io
 import requests
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 from functools import wraps
 
@@ -160,9 +161,7 @@ def start():
 @app.route('/get-download-link', methods=['POST'])
 @rate_limit
 def get_download_link():
-    """Validate license and stream the file directly to user"""
-    from flask import Response
-    
+    """Validate license and send the file directly to user"""
     try:
         data = request.get_json()
         if not data:
@@ -189,28 +188,21 @@ def get_download_link():
         
         app_id = license_data.get("app_id")
         
-        # Step 2: Stream the download directly to user (no disk save)
+        # Step 2: Download the file completely first, then send to user
         dl_res = requests.post(f"{base_url}/download.php", 
                                data={"app_id": app_id}, 
-                               stream=True,
-                               timeout=30)
+                               timeout=120)
         
         if dl_res.status_code != 200:
             return jsonify({"error": "Download server error"}), 502
         
-        # Stream response directly to client
-        def generate():
-            for chunk in dl_res.iter_content(chunk_size=8192):
-                if chunk:
-                    yield chunk
-        
-        return Response(
-            generate(),
-            headers={
-                'Content-Disposition': f'attachment; filename="{generate_random_filename()}"',
-                'Content-Type': 'application/octet-stream',
-                'Content-Length': dl_res.headers.get('content-length', '')
-            }
+        # Use BytesIO + send_file for proper binary handling
+        file_data = io.BytesIO(dl_res.content)
+        return send_file(
+            file_data,
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=generate_random_filename()
         )
         
     except requests.Timeout:
