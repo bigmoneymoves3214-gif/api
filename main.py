@@ -160,7 +160,9 @@ def start():
 @app.route('/get-download-link', methods=['POST'])
 @rate_limit
 def get_download_link():
-    """Validate license and return direct download URL instead of downloading to server"""
+    """Validate license and stream the file directly to user"""
+    from flask import Response
+    
     try:
         data = request.get_json()
         if not data:
@@ -187,14 +189,29 @@ def get_download_link():
         
         app_id = license_data.get("app_id")
         
-        # Return the download URL for direct client download
-        download_url = f"{base_url}/download.php?app_id={app_id}"
+        # Step 2: Stream the download directly to user (no disk save)
+        dl_res = requests.post(f"{base_url}/download.php", 
+                               data={"app_id": app_id}, 
+                               stream=True,
+                               timeout=30)
         
-        return jsonify({
-            "status": "success",
-            "download_url": download_url,
-            "app_id": app_id
-        })
+        if dl_res.status_code != 200:
+            return jsonify({"error": "Download server error"}), 502
+        
+        # Stream response directly to client
+        def generate():
+            for chunk in dl_res.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        
+        return Response(
+            generate(),
+            headers={
+                'Content-Disposition': f'attachment; filename="{generate_random_filename()}"',
+                'Content-Type': 'application/octet-stream',
+                'Content-Length': dl_res.headers.get('content-length', '')
+            }
+        )
         
     except requests.Timeout:
         return jsonify({"error": "License server timeout"}), 504
